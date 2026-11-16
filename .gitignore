@@ -1,0 +1,14 @@
+# Model checkpoints and downloaded weights (large files)
+*.pth
+*.pt
+*.safetensors
+*.bin
+gpt2/
+
+# Python / Jupyter
+__pycache__/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
