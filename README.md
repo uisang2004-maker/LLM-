@@ -9,7 +9,7 @@
 |---|---|---|---|
 | 2 | 텍스트 데이터 다루기 (토큰화, BPE, 슬라이딩 윈도우, 임베딩) | [`ch02_tokenizer/`](ch02_tokenizer/) | 완료 (다시 짜기 일부 보완 중) |
 | 3 | 어텐션 메커니즘 (셀프 어텐션, 코잘 마스크, 멀티 헤드) | [`ch03_attention/`](ch03_attention/) | 실습·다시 짜기 완료 (정리 노트 보완 중) |
-| 4 | GPT 모델 구현 | | |
+| 4 | GPT 모델 구현 (층 정규화, GELU, 숏컷 연결, 트랜스포머 블록, 텍스트 생성) | [`ch04_gpt/`](ch04_gpt/) | 진행 중 |
 | 5 | 사전학습 | | |
 | 6 | 분류 파인튜닝 | | |
 | 7 | 지시를 따르는 파인튜닝 | | |
@@ -59,6 +59,10 @@ ch03_attention/
 ├── attention.py          # 보지 않고 다시 짠 CausalAttention, MultiHeadAttention (python attention.py로 모양·마스킹 확인)
 ├── notes.md              # 내 말로 정리한 핵심 개념, 텐서 모양 따라가기, 이해 확인 질문
 └── notes_review.md       # notes.md 첨삭 (Claude 검토)
+
+ch04_gpt/
+├── ch04_practice.ipynb   # 따라 치기 노트북 (3장의 attention.py를 불러와 GPT 조립, 파라미터 수·생성 토큰까지 책과 비교)
+└── notes.md              # 내 말로 정리할 틀 (텐서 모양 따라가기 표 포함)
 ```
 
 ## 실행 환경
