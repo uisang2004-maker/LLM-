@@ -8,7 +8,7 @@
 | 장 | 주제 | 폴더 | 상태 |
 |---|---|---|---|
 | 2 | 텍스트 데이터 다루기 (토큰화, BPE, 슬라이딩 윈도우, 임베딩) | [`ch02_tokenizer/`](ch02_tokenizer/) | 완료 (다시 짜기 일부 보완 중) |
-| 3 | 어텐션 메커니즘 (셀프 어텐션, 코잘 마스크, 멀티 헤드) | [`ch03_attention/`](ch03_attention/) | 실습 완료 (정리 노트 작성 중) |
+| 3 | 어텐션 메커니즘 (셀프 어텐션, 코잘 마스크, 멀티 헤드) | [`ch03_attention/`](ch03_attention/) | 실습·다시 짜기 완료 (정리 노트 보완 중) |
 | 4 | GPT 모델 구현 | | |
 | 5 | 사전학습 | | |
 | 6 | 분류 파인튜닝 | | |
@@ -38,6 +38,13 @@
 - 찾아서 고친 버그
   - **마스크가 잘못된 칸을 가림**: `torch.triu(..., diagonal=-1)`로 써서 자기 자신과 바로 앞 단어까지 가려짐. 첫 행이 전부 `-inf`가 되어 softmax 결과가 `nan`이 되는 문제라 `diagonal=1`로 수정 (`diagnal` 오타도 함께 수정)
   - **헤드 차원이 맞지 않음**: `MultiHeadAttention`에서 `keys`만 `transpose(1, 2)`하고 `queries`, `values`는 하지 않아 `(b, num_tokens, num_heads, head_dim)`과 `(b, num_heads, ...)`를 곱하려다 에러. 셋 다 `(b, num_heads, num_tokens, head_dim)`으로 바꾸도록 수정. 토큰 수와 헤드 수가 우연히 같으면 에러 없이 틀린 값이 나오는 버그라, 줄마다 텐서 모양을 주석으로 적으며 확인
+- 보지 않고 다시 짜기: `CausalAttention`, `MultiHeadAttention`을 노트에 다시 짜고 `attention.py`로 옮겨 실행. 입력 `(2, 6, 3)` → 출력 `(2, 6, 2)`가 노트의 "텐서 모양 따라가기" 표와 일치하고, 코잘 가중치의 윗삼각이 모두 0·각 행의 합이 1인 것까지 확인
+- 다시 짜기에서 찾아서 고친 버그 (고친 줄마다 `attention.py`에 `# [수정]` 주석)
+  - **마스킹이 적용되지 않음**: `attn_scores.masked_fill(...)`처럼 밑줄 없는 버전을 써서, 마스킹된 새 텐서를 만들기만 하고 버림. 에러 없이 미래 단어를 보게 되는 버그라 `masked_fill_`(제자리 연산)로 수정
+  - **3차원 텐서에 `.T`**: `CausalAttention`에서 `queries @ key.T`로 써서 배치 축까지 뒤집힘(`(d_out, num_tokens, b)`). 마지막 두 축만 바꾸는 `keys.transpose(1, 2)`로 수정 (`.T`는 역행렬이 아니라 전치이고, 멀티 헤드에서는 축이 4개라 `transpose(2, 3)`)
+  - **출력 투영 층의 입력 차원**: `out_proj = nn.Linear(d_in, d_out)`으로 써서, 헤드를 이어 붙인 컨텍스트 벡터(마지막 차원 `d_out`)와 맞지 않음. `nn.Linear(d_out, d_out)`으로 수정 (`d_in`과 `d_out`이 우연히 같으면 에러가 나지 않음)
+  - 그 밖에 `self.num_heads` 저장 누락, `self.` 없이 층 호출, `W_values`/`W_value` 이름 불일치, `contigious` 오타, 굽은 따옴표(`’mask’`) 수정
+- 정리 노트 검토: `notes_review.md`에 Claude가 단 첨삭(맞는 것·보완할 것·틀린 것)을 원래 노트와 나란히 정리
 
 ## 폴더 구성
 
@@ -49,7 +56,9 @@ ch02_tokenizer/
 
 ch03_attention/
 ├── ch03_practice.ipynb   # 따라 치기 노트북 (책의 출력값과 숫자까지 비교하는 확인 셀)
-└── notes.md              # 내 말로 정리할 틀 (텐서 모양 따라가기 표 포함)
+├── attention.py          # 보지 않고 다시 짠 CausalAttention, MultiHeadAttention (python attention.py로 모양·마스킹 확인)
+├── notes.md              # 내 말로 정리한 핵심 개념, 텐서 모양 따라가기, 이해 확인 질문
+└── notes_review.md       # notes.md 첨삭 (Claude 검토)
 ```
 
 ## 실행 환경
