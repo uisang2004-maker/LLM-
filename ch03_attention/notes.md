@@ -11,8 +11,8 @@
 
 | 개념 | 내 말로 설명 |
 | --- | --- |
-| RNN의 한계 (3.1) | 문장이 길어질수록  앞인코더의 내용(그레디언트)를 잃을 가능성이 높다 |
-| 어텐션 점수 | 어텐션 점수는 queries @ key.T 로 보통 표현되며, 원소와 다른원소 사이의 점곱이다 |
+| RNN의 한계 (3.1) | 문장이 길어질수록  인코더 앞부분의 내용(그레디언트)를 잃을 가능성이 높다 |
+| 어텐션 점수 | 어텐션 점수는 queries @ keys.T (keys의 전치, 역행렬 아님. 배치가 있으면 keys.transpose(1, 2))로 보통 표현되며, 원소와 다른원소 사이의 점곱이다 |
 | 어텐션 가중치 | 어텐션 점수/ 키의 차원수 **0.5에 소프트맥스를 한 것으로 표현된다.  |
 | 컨텍스트 벡터 | 어텐션가중치@values로 표현되며, 값들을 가중치에 곱해 최종적인 문맥벡터를 표현한다 |
 | 쿼리 · 키 · 밸류 | query는 현재 초점을 맞추거나 이해할 항목, key는 입력 시퀀스에 있는 각 항목의 key, value는 실제 콘텐츠/표현. 즉 input이 key-value 쌍으로 이루어져 있을 때 query가 특정 집중된 부분을 나타낸다 |
@@ -34,7 +34,7 @@
 | `queries @ keys.transpose(2, 3)` | (2,2,6,1)@(2,2,1,6)= (2,2,6,6) |
 | 컨텍스트 벡터를 다시 합친 뒤 | attn_weights @ values = (2,2,6,1)
 .transpose(1,2)= (2,6,2,1)
-.view(b,bum_tokens,self.d_out)=(2,6,2) |
+.view(b,num_tokens,self.d_out)=(2,6,2) |
 | `out_proj` 뒤 최종 출력 | (2, 6, 2) |
 
 ## Do it! 공부 노트와 비교
@@ -50,107 +50,79 @@
 ## 다시 짜기 체크
 
 - [x]  `CausalAttention`을 보지 않고 다시 짜기
-    
+
+    ```python
     class CausalAttention(nn.Module):
-    
-    def __init __(self, d_in,d_out,context_length,dropout,qkv_bias=False):
-    
-    super().__init__()
-    
-    self.d_out=d_out
-    
-    self.W_query=nn.Linear(d_in,d_out,bias=qkv_bias)
-    
-    self.W_key=nn.Linear(d_in,d_out,bias=qkv_bias)
-    
-    self.W_value=nn.Linear(d_in,d_out,bias=qkv_bias)
-    
-    self.dropout=nn.Dropout(dropout)
-    
-    self.register_buffer(’mask’,torch.triu(torch.ones(context_length,context_length),diagonal=1))
-    
-    def forward(self,x):
-    
-    b, num_tokens, d_in= x.shape
-    
-    keys=self.W_key(x)
-    
-    values=self.W_value(x)
-    
-    queries=self.W_query(x)
-    attn_scores= queries @ key.T
-    
-    attn_scores.masked_fill_( self.mask.bool()[ :num tokens, :num_tokens],-torch.inf)
-    
-    attn_weights=torch.softmax(attn_scores/keys.shape[-1]**0.5,dim=-1)
-    attn_weights=self.dropout(attn_weights)
-    
-    context_vec= attn_weights@values
-    
-    return context_vec
-    
-- [ ]  `MultiHeadAttention`을 보지 않고 다시 짜기 (`attention.py`로 저장)
-    
+        def __init__(self, d_in, d_out, context_length, dropout, qkv_bias=False):
+            super().__init__()
+            self.d_out = d_out
+            self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.dropout = nn.Dropout(dropout)
+            self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
+
+        def forward(self, x):
+            b, num_tokens, d_in = x.shape
+            keys = self.W_key(x)
+            values = self.W_value(x)
+            queries = self.W_query(x)
+            attn_scores = queries @ keys.transpose(1, 2)  # 배치 축은 두고 마지막 두 축만 바꿈 (3차원에 .T를 쓰면 축이 전부 뒤집힘)
+
+            attn_scores.masked_fill_(self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)
+
+            attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+
+            context_vec = attn_weights @ values
+            return context_vec
+    ```
+
+- [x]  `MultiHeadAttention`을 보지 않고 다시 짜기 (`attention.py`로 저장)
+
+    ```python
     class MultiHeadAttention(nn.Module):
-    
-    def __init __(self, d_in, d_out, context_length, dropout,num_heads,qkv_bias=False):
-    
-    super().__init __()
-    
-    self.d_out=d_out
-    
-    self.head_dim=d_out//num_heads
-    
-    self.W_query=nn.Linear(d_in,d_out,qkv_bias)
-    
-    self.W_key=nn.Linear(d_in,d_out,qkv_bias)
-    
-    self.W_values=nn.Linear(d_in,d_out,qkv_bias)
-    
-    self.out_proj=nn.Linear(d_in,d_out) #헤드의 출력을 결합할 Linear 변수
-    
-    self.dropout=nn.Dropout(dropout)
-    
-    self.register_buffer(’mask’,torch.triu(torch.ones(context_length,context_length),diagonal=1)
-    
-    def forward(self,x):
-    
-    b,num_tokens,d_in=x.shape #텐서크기를 각각의 변수에 담기
-    
-    keys=W_key(x) #크기⇒b,num_tokens,d_out
-    
-    queries=W_query(x)
-    
-    values=W_value(x)
-    
-    keys=keys.view(b,num_tokens,self.num_heads,self.head_dim) #d_out의 차원을 num_heads와 head_dim 두개의 차원으로 다시 나눔
-    
-    values=values.view(b,num_tokens,self.num_heads,self.head_dim)
-    
-    queries=queries.view(b,num_tokens,self.num_heads,self.head_dim)
-    
-    keys=keys.transpose(1,2) #(b,num_heads,num_tokens, head_dim)차원으로 변환
-    
-    values=values.transpose(1,2)
-    
-    queries=queries.transpose(1,2) 
-    
-    attn_scores=queries@keys.transpose(2,3) #행렬의 차원이 4개로 늘어 마지막 2개 차원인 2,3을 변환 (≠keys.T)
-    
-    attn_scores.masked_fill(self.mask.bool([:num_tokens, :num_tokens],-torch.inf) #논리형 마스크 호출(1,0으로 이루어진 마스크)⇒토큰 갯수로 자르기⇒0은 -inf로 채우기
-    
-    attn_weights=torch.softmax( attn_scores/keys.shape[-1]**0.5,dim=-1)
-    
-    attn_weights=self.dropout(attn_weights)
-    
-    context_vec=(attn_weights@values).transpose(1,2)#다시 원래 형태로 되돌리기(b,num_tokens,num_heads,head_dim)
-    
-    context_vec=context_vec.contigious().view(b,num_tokens,d_out) #self.num_heads와head_dim을 곱해서 다시 원래 형태로 되돌림
-    
-    context_vec=self.out_proj(context_vec)
-    
-    return context_vec
-    
+        def __init__(self, d_in, d_out, context_length, dropout, num_heads, qkv_bias=False):
+            super().__init__()
+            self.d_out = d_out
+            self.num_heads = num_heads  # forward에서 쓰므로 저장
+            self.head_dim = d_out // num_heads
+
+            self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
+            self.out_proj = nn.Linear(d_out, d_out)  # 헤드의 출력을 결합할 Linear 층 (입력은 이어 붙인 헤드 출력 → d_out)
+            self.dropout = nn.Dropout(dropout)
+            self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
+
+        def forward(self, x):
+            b, num_tokens, d_in = x.shape  # 텐서크기를 각각의 변수에 담기
+
+            keys = self.W_key(x)  # 크기⇒b,num_tokens,d_out
+            queries = self.W_query(x)
+            values = self.W_value(x)
+
+            keys = keys.view(b, num_tokens, self.num_heads, self.head_dim)  # d_out의 차원을 num_heads와 head_dim 두개의 차원으로 다시 나눔
+            values = values.view(b, num_tokens, self.num_heads, self.head_dim)
+            queries = queries.view(b, num_tokens, self.num_heads, self.head_dim)
+
+            keys = keys.transpose(1, 2)  # (b,num_heads,num_tokens, head_dim)차원으로 변환
+            values = values.transpose(1, 2)
+            queries = queries.transpose(1, 2)
+
+            attn_scores = queries @ keys.transpose(2, 3)  # 행렬의 차원이 4개로 늘어 마지막 2개 차원인 2,3을 변환 (≠keys.T)
+
+            attn_scores.masked_fill_(self.mask.bool()[:num_tokens, :num_tokens], -torch.inf)  # 논리형 마스크 호출(1,0으로 이루어진 마스크)⇒토큰 갯수로 자르기⇒1(True, 미래 토큰) 자리를 -inf로 채우기. 밑줄 있는 masked_fill_이라야 attn_scores가 직접 바뀜
+
+            attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
+            attn_weights = self.dropout(attn_weights)
+
+            context_vec = (attn_weights @ values).transpose(1, 2)  # 다시 원래 형태로 되돌리기(b,num_tokens,num_heads,head_dim)
+            context_vec = context_vec.contiguous().view(b, num_tokens, self.d_out)  # self.num_heads와head_dim을 곱해서 다시 원래 형태로 되돌림
+            context_vec = self.out_proj(context_vec)
+            return context_vec
+    ```
+
 
 ## 이해 확인 질문
 
@@ -160,7 +132,7 @@
     
 2. √d_k로 나누지 않으면 어떤 문제가 생길까?
     
-    나누는 값이 너무 커져 가중치가 너무 작아진다 = 계산 효율이 떨어진다
+    점곱 값(어텐션 점수)이 너무 커져서 softmax가 한 칸에 거의 1을 몰아주고 나머지 가중치는 0에 가까워진다 = 그레디언트가 0에 가까워져 학습이 잘 안 된다
     
 3. 코잘 마스크에서 softmax 뒤에 0을 곱하는 대신, softmax 앞에 `inf`를 채우는 이유는?
     
@@ -168,7 +140,7 @@
     
 4. 드롭아웃은 왜 학습할 때만 쓰고 예측할 때는 끌까?
     
-    학습할 때는 과적합을 방지하기 위해 끄고, 예측할 땐 정확한 예측을 위해서 모든 데이터를 적용한다
+    학습할 때는 과적합을 방지하기 위해 켜고, 예측할 땐 정확한 예측을 위해서 모든 데이터를 적용한다
     
 5. `MultiHeadAttentionWrapper`와 `MultiHeadAttention`은 결과는 같은 역할인데 무엇이 다를까? 왜 뒤의 것이 더 효율적일까?
     
