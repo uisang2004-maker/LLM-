@@ -21,6 +21,8 @@
 3. 개념을 **내 말로** `notes.md`에 정리
 4. 막힌 곳과 찾은 버그를 기록
 
+공부하며 나온 `nn.`, `torch.` 함수는 [`pytorch_cheatsheet.md`](pytorch_cheatsheet.md)에 표로 모아 둡니다.
+
 ## 2장 기록
 
 - 2.2~2.8절을 모두 구현하고, 최종 LLM 입력 `(배치 8, 토큰 4, 임베딩 256)`까지 확인
@@ -63,6 +65,8 @@ ch03_attention/
 ch04_gpt/
 ├── ch04_practice.ipynb   # 따라 치기 노트북 (3장의 attention.py를 불러와 GPT 조립, 파라미터 수·생성 토큰까지 책과 비교)
 └── notes.md              # 내 말로 정리할 틀 (텐서 모양 따라가기 표 포함)
+
+pytorch_cheatsheet.md     # nn.·torch. 함수 정리표 (하는 일, 모양 변화, 어디서 썼는지)
 ```
 
 ## 실행 환경
